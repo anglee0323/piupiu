@@ -1,6 +1,6 @@
 {
  "name": "piupiu",
- "version": "3.3.19",
+ "version": "3.3.20",
  "description": "Piupiu：本地自用的 BSC Agent ID 内盘交易终端（Flap / Four / gang.fun），GMGN 式界面，通过币安 Agentic Wallet（baw）下单",
  "main": "server.js",
  "type": "module",

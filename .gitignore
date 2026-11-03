@@ -41,3 +41,6 @@ desktop/dist/
 
 # 发版产物（scripts/release.mjs）
 desktop/release/
+
+# 上游巡检的工作文件（基准存在 upstream-watch 分支，见 .github/workflows/upstream.yml）
+cloud/watch/

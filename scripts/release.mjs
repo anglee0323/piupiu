@@ -4,7 +4,7 @@
 //   node scripts/release.mjs core  [--notes "改了什么"] [--force]   内核（Gateway + 界面）：整理 → 打包 → 清单 → 签名
 //   node scripts/release.mjs shell [--notes "改了什么"]             外壳：收集 desktop/dist 里的安装包 → 清单 → 签名 → 下载页
 //   node scripts/release.mjs remanifest                             给已有清单补 moveTo（迁到 R2 下载地址）并重新签名，不重新打包
-//   上传到更新服务器：在私有仓库 piupiu-cloud 里运行 node scripts/publish-release.mjs（服务器地址等只放在私有仓库）
+//   上传到更新服务器：node cloud/scripts/publish-release.mjs（官网与发布在 cloud/，不进安装包、不进开源版）
 // 版本号：内核 = 根目录 package.json，外壳 = desktop/package.json；发版前自己改（新版本号必须比服务器上的高）。
 // 产物在 ~/.piupiu-build/release/：update/（core.json、core-*.tgz、shell.json，各带 .sig）、download/（安装包）、index.html（下载页）。
 import { execFileSync } from 'node:child_process';
@@ -127,12 +127,20 @@ function build() {
   console.log(`安装包在 ${BUILD_OUT}`);
 }
 
+// 发内核时顺带同步开源版到公开仓库（scripts/export-oss.mjs 只在私有仓库里有）；失败不影响已签好的内核，提示手动重跑。--no-oss 跳过
+function syncOss() {
+  const script = join(ROOT, 'scripts', 'export-oss.mjs');
+  if (args.includes('--no-oss') || !existsSync(script)) return;
+  try { execFileSync(process.execPath, [script, '--check', '--publish'], { cwd: ROOT, stdio: 'inherit' }); }
+  catch { console.error('开源版同步失败（内核已签好，不受影响）。修复后运行：node scripts/export-oss.mjs --check --publish'); }
+}
+
 const cmd = args[0];
 try {
   if (cmd === 'build') build();
-  else if (cmd === 'core') await core();
+  else if (cmd === 'core') { await core(); syncOss(); }
   else if (cmd === 'shell') shell();
   else if (cmd === 'remanifest') remanifest();
-  else if (cmd === 'publish') { console.log('上传已移到私有仓库：cd ../piupiu-cloud && node scripts/publish-release.mjs'); process.exit(1); }
+  else if (cmd === 'publish') { console.log('上传：node cloud/scripts/publish-release.mjs'); process.exit(1); }
   else { console.log('用法：node scripts/release.mjs build|core|shell [--notes "…"] [--force]'); process.exit(1); }
 } catch (e) { console.error(`发版失败：${e.message}`); process.exit(1); }

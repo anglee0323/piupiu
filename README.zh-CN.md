@@ -8,6 +8,8 @@
   <a href="https://piupiuagent.xyz">官网</a> ·
   <a href="https://piupiuagent.xyz/#download">下载</a> ·
   <a href="docs/self-hosting.md">自部署</a> ·
+  <a href="https://x.com/anglee0323">X</a> ·
+  <a href="https://t.me/PIUPIUAGENT">Telegram</a> ·
   <a href="README.md">English</a>
 </p>
 
