@@ -39,7 +39,7 @@ Requires Node.js 20+, a verified Binance account with an Agentic Wallet (develop
 ```bash
 git clone https://github.com/anglee0323/piupiu.git && cd piupiu
 npm install && npm run web:build
-cp .env.example .env
+cp .env.example .env    # then set RPC_URL (a BSC node) in .env
 npm run quote:8788   # live market data, quote only; open http://127.0.0.1:8788
 ```
 
