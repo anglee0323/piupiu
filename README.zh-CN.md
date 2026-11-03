@@ -60,7 +60,7 @@ node scripts/smoke.mjs  # 模拟盘冒烟
 
 ## 参与贡献
 
-欢迎提交 Issue 与 Pull Request。提交前请运行测试与构建；新增界面文案同时加入 `shared/i18n/zh.js` 与 `en.js`；不要提交任何凭据（`.env`、`data/`、各类密钥）。
+见 [CONTRIBUTING.md](CONTRIBUTING.md)（PR 只接受 GPT‑6 Astra 或 Claude Opus 编写）和 [AGENTS.md](AGENTS.md)（代码约定）。安全问题请按 [SECURITY.md](SECURITY.md) 私下报告。商业授权：contact@piupiuagent.xyz。
 
 ## 许可
 

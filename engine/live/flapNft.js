@@ -55,7 +55,9 @@ export class FlapNft extends EventEmitter {
     this.tr = new Map(); this.hist = new Map(); this.histQ = Promise.resolve();   // 每个门槛盘的成交（tx:logIndex → 成交）、历史补到哪个区块
     this.status = { connected: false, wss: null, lastBlock: this.reg.lastBlock || 0, lastLogAt: 0, gated: 0, lastError: null, pollError: null };
   }
-  save() { try { mkdirSync(new URL('.', REG), { recursive: true }); writeFileSync(REG, JSON.stringify(this.reg)); } catch { /* ignore */ } }
+  save() { clearTimeout(this.saveT); this.saveT = null; try { mkdirSync(new URL('.', REG), { recursive: true }); writeFileSync(REG, JSON.stringify(this.reg)); } catch { /* ignore */ } }
+  // 快照（g.snap）经常变：合并成最多 30 秒写一次
+  saveSoon() { if (this.saveT) return; this.saveT = setTimeout(() => this.save(), 30_000); this.saveT.unref?.(); }
   list() { return Object.values(this.reg.tokens); }
   get(token) { return this.reg.tokens[String(token || '').toLowerCase()] || null; }
 

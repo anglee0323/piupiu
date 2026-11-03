@@ -56,7 +56,7 @@ export class LiveMarket extends EventEmitter {
     this.gangPads.on('trade', (tr) => this.onGangTrade(tr, true));
     // Flap 普通 Portal 的 Agent ID 门槛盘（NFT-gated）：只有这类 Portal 盘会进列表（普通 Flap Portal 盘本终端不跟踪）
     this.flapNft = new FlapNft(this.provider);
-    this.flapNft.on('gated', (g, o) => this.upsertFlapNft(g, o).catch(() => {}));
+    this.flapNft.on('gated', (g, o) => (o?.restore ? this.restoreFlapNft(g) : this.upsertFlapNft(g, o).catch(() => {})));
     this.flapNft.on('ungated', (g) => { const t = this.get(g.token); if (t?.nftGate) { t.nftGate = { ...t.nftGate, removed: true }; this.emit('detail', t.address); } });
     this.flapNft.on('trade', (tr) => this.onFlapNftTrade(tr));
     this.flapNft.on('dex', (g) => { const t = this.get(g.token); if (t && t.stage === 'curve') { t.stage = 'dex'; t.progress = 100; this.emit('migrate', this.summary(t)); } });
@@ -80,7 +80,9 @@ export class LiveMarket extends EventEmitter {
     this.feeds.on('graduated', (m) => { const t = this.get(m.token); if (t) { t.stage = 'dex'; this.emit('migrate', this.summary(t)); } });
     this.curve.start();
     this.four.start();
-    this.fourRestore();
+    // 首批行情到齐（Gang 第一轮列表 + Four 盘恢复，最多等 12 秒）：界面据此结束「正在同步行情」，不再固定等 12 秒
+    this.warmReady = false;
+    Promise.race([Promise.all([this.fourRestore(), new Promise((r) => this.gang.once('listReady', r))]), new Promise((r) => setTimeout(r, 12_000))]).then(() => { this.warmReady = true; });
     setTimeout(() => this.fourDexCheck(), 20_000); this.fourDexTimer = setInterval(() => this.fourDexCheck(), 60_000);
     this.gang.start(); this.bonds.start(); this.gangChain.start(); this.flapChain.start(); this.gangPads.start(); this.flapNft.start();
     this.feeds.start();
@@ -105,18 +107,25 @@ export class LiveMarket extends EventEmitter {
       this.tokens.set(k, { address: k, symbol: '?', name: '', platform: 'flap', quote: 'BNB', createdAt: Date.now(), stage: 'curve', price: 0, mcapUsd: 0, raised: 0, target: 0, progress: 0,
         remaining: 0, holders: null, buys: 0, sells: 0,   // holders：null = 还不知道，页面显示「—」
  volume: 0, buyTax: 0, sellTax: 0, feeBps: null, trades: [], candles: [], creator: '', market: null });
-      if (this.tokens.size > MAX) {
-        const keep = this.keepSet?.() || new Set();   // 持有中、收藏的币（server.js 设置），永远不淘汰
-        // 淘汰顺序：最久没人交易的内盘死盘先走；已开盘且有流动性 / 市值的不淘汰（以前按创建时间淘汰，GANG 这种早就毕业的大币反而先被踢掉）
-        const alive = (t) => t.stage === 'dex' && ((t.dexLiqUsd || 0) >= 3000 || (t.dexMcapUsd || t.mcapUsd || 0) >= 20000);
-        // 上限只数可以淘汰的币：Flap Agent 曲线市场等不淘汰的币可能有上千个（开发版数据里攒了 1490 个），
-        // 以前按总数比，总数永远超标，每来一个新币就踢掉一个别的币，Gang / Four 的新盘几乎全被挤掉、列表里看不到
-        const cand = [...this.tokens.values()].filter((t) => !t.pinned && !keep.has(t.address) && t.source !== 'agent-curve' && t.source !== 'flap-nft' && !(t.source === 'four-agent' && t.stage === 'dex') && !alive(t));
-        const old = cand.length > MAX ? cand.filter((t) => t.address !== k).sort((a, b) => Math.max(a.lastTradeAt || 0, a.createdAt) - Math.max(b.lastTradeAt || 0, b.createdAt))[0] : null;
-        if (old) this.tokens.delete(old.address);
-      }
+      if (this.tokens.size > MAX && !this.pruneT) { this.pruneT = setTimeout(() => { this.pruneT = null; this.prune(); }, 1000); this.pruneT.unref?.(); }
     }
     return this.tokens.get(k);
+  }
+
+  // 淘汰：攒 2 秒一起做（以前每加一个新币就把全部币扫一遍、排序挑一个淘汰，启动时几千个币进来是平方级的计算，主线程卡 1 秒多）
+  prune() {
+    const keep = this.keepSet?.() || new Set();   // 持有中、收藏的币（server.js 设置），永远不淘汰
+    // 淘汰顺序：最久没人交易的内盘死盘先走；已开盘且有流动性 / 市值的不淘汰（以前按创建时间淘汰，GANG 这种早就毕业的大币反而先被踢掉）
+    const alive = (t) => t.stage === 'dex' && ((t.dexLiqUsd || 0) >= 3000 || (t.dexMcapUsd || t.mcapUsd || 0) >= 20000);
+    // 上限只数可以淘汰的币：Flap 门槛盘、Agent 曲线市场、Four Agent 专属盘不淘汰（Four 数量少、是核心功能；以前刚恢复的盘没有近期成交，马上被 Gang 的老盘挤掉）
+    const cand = [...this.tokens.values()].filter((t) => !t.pinned && !keep.has(t.address) && t.source !== 'agent-curve' && t.source !== 'flap-nft' && t.source !== 'four-agent' && !alive(t));
+    if (cand.length <= MAX) return;
+    // 按最近动静（成交或创建时间）从旧到新淘汰；刚发射的新盘创建时间最近，不会被选中
+    const old = cand.sort((a, b) => Math.max(a.lastTradeAt || 0, a.createdAt) - Math.max(b.lastTradeAt || 0, b.createdAt));
+    // 记下被淘汰的（地址 → 淘汰时间）：Gang 列表每轮都会把它们原样带回来，没有新成交就不再加回（不然每轮几百个币进来又被淘汰，推送反复抖动）
+    this.evicted ||= new Map();
+    for (const t of old.slice(0, cand.length - MAX)) { this.tokens.delete(t.address); this.evicted.set(t.address, Date.now()); }
+    if (this.evicted.size > 20_000) this.evicted = new Map([...this.evicted].slice(-10_000));
   }
 
   upsertCurve(it, isNew) {
@@ -177,11 +186,18 @@ export class LiveMarket extends EventEmitter {
   fourSave() { clearTimeout(this.fourSaveT); this.fourSaveT = setTimeout(() => { try { const o = {}; for (const t of this.tokens.values()) if (t.source === 'four-agent') o[t.address] = { createdAt: t.createdAt, metaUri: t.metaUrl || null, stage: t.stage }; const old = this.fourReg || {}; mkdirSync(new URL('.', FOUR_REG), { recursive: true }); writeFileSync(FOUR_REG, JSON.stringify({ ...old, ...o })); this.fourReg = { ...old, ...o }; } catch { /* ignore */ } }, 3000); }
   async fourRestore() {
     try { this.fourReg = JSON.parse(readFileSync(FOUR_REG, 'utf8')); } catch { this.fourReg = {}; return; }
-    for (const [a, r] of Object.entries(this.fourReg)) {
-      if (this.tokens.has(a)) continue;
-      try { const it = await this.four.lookup(a); const t = this.get(a); if (it && t) { if (r.createdAt) t.createdAt = r.createdAt; if (r.stage === 'dex') t.stage = 'dex'; this.loadMeta(t, r.metaUri); } } catch { /* ignore */ }
-      await new Promise((ok) => setTimeout(ok, 400));
-    }
+    // 还在内盘的、最新的先恢复（战壕先有内容），4 个一起查（以前一个一个查、每个之间再等 0.4 秒，92 个盘要一分半钟）
+    const list = Object.entries(this.fourReg).filter(([a]) => !this.tokens.has(a))
+      .sort(([, x], [, y]) => (x.stage === 'dex') - (y.stage === 'dex') || (y.createdAt || 0) - (x.createdAt || 0));
+    let i = 0;
+    const worker = async () => {
+      while (i < list.length) {
+        const [a, r] = list[i++];
+        if (this.tokens.has(a)) continue;
+        try { const it = await this.four.lookup(a); const t = this.get(a); if (it && t) { if (r.createdAt) t.createdAt = r.createdAt; if (r.stage === 'dex') t.stage = 'dex'; this.loadMeta(t, r.metaUri); } } catch { /* ignore */ }
+      }
+    };
+    await Promise.all(Array.from({ length: 4 }, worker));
   }
   // 迁移判定 + 外盘价格：DexScreener 批量查（每批 30 个，不占 RPC）；有 PancakeSwap 池子就算已迁移
   async fourDexCheck() {
@@ -221,9 +237,46 @@ export class LiveMarket extends EventEmitter {
       if (!t.creator) this.flapNft.creatorOf(k, g.tx).then((c) => { if (c && !t.creator) { t.creator = c; this.emit('detail', t.address); } }).catch(() => {});   // 开发者地址：异步补，不挡住列表
       this.flapNftHistory(t).then(() => { if (t.stage === 'dex') return this.dexRefresh(t).then(() => this.emit('detail', t.address)); }).catch(() => {});   // 内盘成交从创建起补齐；已迁移的顺便读一次外盘价，列表里市值不再是「—」
       await this.flapNftTax(t).catch(() => {});
+      this.flapSnap(t);
       if (!existed && !restore && t.stage === 'curve') this.emit('launch', { ...this.summary(t), detectMs: Math.max(0, Date.now() - (t.createdAt || Date.now())) });
     }
   }
+  // 门槛盘快照（存在 flapNft 登记表的 g.snap）：重启时直接用，不再逐个读链。以前重启要把一千多个门槛盘每个重读约 10 次
+  // （名字 / 代号 / 元数据 / 状态 / 税率 / 成交），启动第一分钟一万多次请求把公共节点打到限流，战壕要等很久、底栏延迟到好几秒。
+  // 快照之后由 flapNftTick 在 10 分钟内分散地补最新状态；正在看的币照常实时刷新
+  flapSnap(t) {
+    const g = this.flapNft.get(t.address); if (!g) return;
+    const pick = (o, ks) => Object.fromEntries(ks.filter((k) => o[k] != null).map((k) => [k, o[k]]));
+    g.snap = { at: Date.now(), metaUrl: t.metaUrl || null, nativeSwap: t.flapNativeSwap,
+      ...pick(t, ['symbol', 'name', 'quote', 'quoteAddress', 'stage', 'progress', 'raised', 'target', 'remaining', 'price', 'mcapUsd', 'buys', 'sells', 'volume', 'holders', 'lastTradeAt', 'creator', 'flapTax', 'nftGate', 'image', 'description', 'website', 'twitter', 'telegram']) };
+    this.flapNft.saveSoon();
+  }
+  restoreFlapNft(g) {
+    const s = g.snap, k = g.token;
+    if (this.tokens.has(k) && this.get(k).source !== 'flap-nft') return;
+    if (!s) { (this.flapRestoreQ ||= []).push(g); this.pumpFlapRestore(); return; }
+    const t = this.base(k);
+    const { at, metaUrl, nativeSwap, flapTax, nftGate, ...rest } = s;
+    Object.assign(t, rest, { source: 'flap-nft', platform: 'flap', agentExclusive: g.nft === '0x60b9262456de011f7d15a54cdd8c48baaa8b022f', quote: s.quote || 'BNB', createdAt: g.at || g.seenAt, maxSupply: 1e9,
+      flapNativeSwap: nativeSwap, holdersKnown: false, nftGate: { capPct: 2, ...nftGate, nft: g.nft, removed: !!g.removed, known: g.nft === '0x60b9262456de011f7d15a54cdd8c48baaa8b022f' } });
+    if (metaUrl) t.metaUrl = metaUrl;
+    if (flapTax) this.applyFlapTax(t, flapTax);
+    t.nftStateAt = Date.now() - Math.random() * 600_000;   // 10 分钟内陆续刷新，不一起涌上来
+    if (Date.now() - Math.max(s.lastTradeAt || 0, t.createdAt || 0) < 24 * 3600_000) this.flapNftHistory(t).catch(() => {});   // 一天内有动静的才补成交；其余等打开时再补
+  }
+  // 没有快照的（第一次升级到这个版本、刚搜到的）：同时最多 3 个，新创建的先来
+  pumpFlapRestore() {
+    if (this.flapRestoreT) return;
+    this.flapRestoreT = setTimeout(async () => {
+      const q = (this.flapRestoreQ || []).sort((a, b) => (b.at || b.seenAt || 0) - (a.at || a.seenAt || 0)); this.flapRestoreQ = [];
+      let i = 0;
+      const w = async () => { while (i < q.length) { const g = q[i++]; await this.upsertFlapNft(g, { restore: true }).catch(() => {}); } };
+      await Promise.all([w(), w(), w()]);
+      this.flapRestoreT = null;
+      if (this.flapRestoreQ.length) this.pumpFlapRestore();
+    }, 0);
+  }
+
   // 名字 / 代号 / 图标：读失败（节点限流等）时为空，代号留着「?」；flapNftTick 每 30 秒重试一次，直到读到为止
   async flapNftMeta(t) {
     t.metaTryAt = Date.now();
@@ -251,7 +304,10 @@ export class LiveMarket extends EventEmitter {
   // 税率 / 受益人 / 分红：读链上（flapNft.taxInfo），5 分钟刷新一次（累计分红、营销金额会变）
   async flapNftTax(t, force = false, ttl = 300_000) {
     if (!force && t.flapTax && Date.now() - t.flapTax.at < ttl) return;
-    const v = await this.flapNft.taxInfo(t.address); t.flapTax = v;
+    this.applyFlapTax(t, await this.flapNft.taxInfo(t.address));
+  }
+  applyFlapTax(t, v) {
+    t.flapTax = v;
     t.buyTax = v.buyBps / 100; t.sellTax = v.sellBps / 100;
     const q = v.divSym === 'BNB' ? this.bnbUsd : 0;
     t.gangDiv = { flap: true, taxed: v.divBps > 0, taxBps: Math.round(Math.max(v.buyBps, v.sellBps) * v.divBps / 10000), vault: v.divContract || null,
@@ -276,7 +332,7 @@ export class LiveMarket extends EventEmitter {
         const every = this.nftEvery(t, keep, now);
         if (every && now - (t.nftStateAt || 0) < every) continue;
         t.nftStateAt = now;
-        try { await this.applyFlapNftState(t, await this.flapNft.state(t.address)); await this.flapNftTax(t, false, every >= 600_000 ? 6 * 3600_000 : 300_000); } catch { /* 下一轮 */ }   // 沉寂币的税率 / 分红信息 6 小时才重读（每次 7 次调用）
+        try { await this.applyFlapNftState(t, await this.flapNft.state(t.address)); await this.flapNftTax(t, false, every >= 600_000 ? 6 * 3600_000 : 300_000); this.flapSnap(t); } catch { /* 下一轮 */ }   // 沉寂币的税率 / 分红信息 6 小时才重读（每次 7 次调用）
         if ((!t.name || t.symbol === '?' || !t.metaUrl) && Date.now() - (t.metaTryAt || 0) > 30_000) await this.flapNftMeta(t).catch(() => {});
       }
     } finally { this.nftBusy = false; }
@@ -316,6 +372,8 @@ export class LiveMarket extends EventEmitter {
   // gang.fun：接口给的列表（已筹 / 进度 / 价格 / FDV / 持有人）；毕业门槛按 已筹 ÷ 进度 推算
   upsertGang(it, isNew) {
     const existed = this.tokens.has(this.key(it.address));
+    const ev = !existed && this.evicted?.get(this.key(it.address));
+    if (ev && !isNew && !((it.lastTradeAt || 0) * 1000 > ev)) return;   // 淘汰后没有新成交的，不再加回
     const t = this.base(it.address);
     const qa = String(it.quoteAddress || '').toLowerCase();
     if (t._qDec == null && qa && QUOTE_DEC[qa]) t._qDec = QUOTE_DEC[qa];   // 已知的非 18 位报价币（XAUt 6 位、BEM 8 位）马上用，不等链上曲线
@@ -342,9 +400,12 @@ export class LiveMarket extends EventEmitter {
     // V2 报价币（GANG / ZEC / 币股…）的美元价用 gang.fun 给的，quoteUsd() 换美元要用
     if (it.quoteAddress && it.quoteUsd && !(this.qUsd[it.quoteAddress.toLowerCase()] > 0)) this.qUsd[it.quoteAddress.toLowerCase()] = it.quoteUsd;
     if (isNew && !existed) this.emit('launch', { ...this.summary(t), detectMs: Math.max(0, Date.now() - t.createdAt) });   // 链上已经先发现过的，接口再看到时不重复提示
-    // 最近有成交的几个 + 当前选中的，定时拉成交
-    const hot = [...this.tokens.values()].filter((x) => x.source === 'gang' && x.gangTrack !== 'v3fair' && x.lastTradeAt).sort((a, b) => b.lastTradeAt - a.lastTradeAt).slice(0, 5).map((x) => x.address);
-    this.gang.setHot(hot);
+    // 最近有成交的几个 + 当前选中的，定时拉成交。一轮列表上千个币：攒到这一轮处理完再算一次（以前每个币都把全部币扫一遍再排序，启动时主线程卡 1 秒多）
+    if (!this.hotT) this.hotT = setTimeout(() => {
+      this.hotT = null;
+      const hot = [...this.tokens.values()].filter((x) => x.source === 'gang' && x.gangTrack !== 'v3fair' && x.lastTradeAt).sort((a, b) => b.lastTradeAt - a.lastTradeAt).slice(0, 5).map((x) => x.address);
+      this.gang.setHot(hot);
+    }, 300);
   }
 
   // 链上发现的 Gang 新盘：先上列表（名称、符号、创建者、计价币都来自事件），市值 / 头像等等接口轮询补上

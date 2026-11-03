@@ -60,7 +60,7 @@ Layout: `server.js` (gateway), `engine/live/` (markets, execution, automation), 
 
 ## Contributing
 
-Issues and pull requests are welcome. Please run the tests and the build before submitting, add new interface strings to both `shared/i18n/zh.js` and `en.js`, and never commit credentials (`.env`, `data/`, keys).
+See [CONTRIBUTING.md](CONTRIBUTING.md) (pull requests are accepted from GPT‑6 Astra or Claude Opus) and [AGENTS.md](AGENTS.md) for the conventions. Report security issues privately as described in [SECURITY.md](SECURITY.md). Commercial licensing: contact@piupiuagent.xyz.
 
 ## License
 

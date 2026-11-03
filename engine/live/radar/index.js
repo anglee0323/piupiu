@@ -54,7 +54,7 @@ export class Radar {
     this.status = { scanning: false, cursor: 0, behind: 0, gaps: 0, node: '—', lastHeadAt: 0, lastError: null, platform: [] };
     this.aiKnown = 0;
     // 分析用一组公共节点轮换（被限流的冷却换下一个），和扫块的连接分开，互不抢额度；不含 NodeReal
-    this.provider = new FailoverProvider(EP.rpcPublic, '雷达分析');
+    this.provider = new FailoverProvider([...EP.rpcPublic].reverse(), '雷达分析')   // 和行情读取错开：行情优先前两个公共节点，雷达优先后面的，启动时不挤在同一个节点上被限流;
     this.chain = new Chain(this.provider);
     // 动态排除 + 中文名：行情里已有的代币 / 内盘市场（战壕看得见的不重复报，但「链上动态」里要知道 .ai 钱包在交易它们）
     this.known = new Known(() => {
@@ -67,7 +67,7 @@ export class Radar {
     });
     this.ai = new AiSet({ provider: this.provider, names: market.names, log });
     this.scan = null; this.timer = null; this.saveT = null; this.pushT = null; this.namesProbed = new Set();
-    this.queue = []; this.queued = new Set(); this.running = 0; this.topSet = new Set();   // topSet：排在前面的几个，后台也去查推特
+    this.queue = []; this.queued = new Set(); this.running = 0; this.topSet = new Set(); this.bootAt = Date.now();   // topSet：排在前面的几个，后台也去查推特
     this.activity = new Map();   // key → { label, address, who: Map(from → t) }
     this.part = new Participate({
       trader, provider: this.provider, txProvider: market.tradeProvider || this.provider,
@@ -209,8 +209,12 @@ export class Radar {
     this.queued.add(a); if (front) this.queue.unshift(a); else this.queue.push(a);
     this.kick();
   }
+  // 启动后第一分钟只同时分析 1 个项目（缓存里的分析都过期了，会一起排队重分析，每个几十到上百次调用，和行情读取抢公共节点，
+  // 启动时节点被限流、底栏延迟冲到几秒）；之后恢复 3 个。列表先显示缓存里的结果
   kick() {
-    while (this.running < 3 && this.queue.length) {
+    const warm = Date.now() - this.bootAt < 60_000;
+    if (warm && !this.warmT) { this.warmT = setTimeout(() => this.kick(), 60_000 - (Date.now() - this.bootAt) + 50); this.warmT.unref?.(); }
+    while (this.running < (warm ? 1 : 3) && this.queue.length) {
       const a = this.queue.shift(); this.queued.delete(a); this.running++;
       this.runAnalysis(a).catch((e) => this.log(`[雷达] 分析 ${short(a)} 出错：${e.message}`)).finally(() => { this.running--; this.kick(); });
     }

@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability / 安全漏洞
+    url: mailto:security@piupiuagent.xyz
+    about: Report privately by email, never in a public issue / 请发邮件私下报告，不要公开提交
+  - name: Questions & community / 使用问题与交流
+    url: https://t.me/PIUPIUAGENT
+    about: Ask in the Telegram group / 在 Telegram 群里提问
+  - name: Commercial license / 商业授权
+    url: mailto:contact@piupiuagent.xyz
+    about: Licensing and business enquiries / 授权与合作

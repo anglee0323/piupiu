@@ -843,7 +843,7 @@ let tickSeq = 0;
 const sentTok = new Map();   // 地址 → 上次推出去的币对象（用来对比 + 给新连接做全量）
 const sentStr = new Map();   // 地址 → 上次推出去的 JSON（对比用，避免逐字段比较）
 const STARTED_AT = Date.now() - Math.round(process.uptime() * 1000);   // 界面据此在后台刚启动的头几秒显示「正在同步行情」，不让列表一条一条往外蹦
-const tickBase = () => ({ startedAt: STARTED_AT, ...modeInfo(), block: market.block, bnbUsd: market.bnbUsd, net, wallets: trader.walletsView(), usage: agent.usageView(), positions: trader.positionsView(), claimable: LIVE ? trader.claimable : [] });
+const tickBase = () => ({ startedAt: STARTED_AT, warm: LIVE ? !!market.warmReady : true, ...modeInfo(), block: market.block, bnbUsd: market.bnbUsd, net, wallets: trader.walletsView(), usage: agent.usageView(), positions: trader.positionsView(), claimable: LIVE ? trader.claimable : [] });
 function tokenDelta() {
   const up = [], seen = new Set();
   for (const t of market.list()) {

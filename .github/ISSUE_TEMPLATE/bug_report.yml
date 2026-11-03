@@ -1,0 +1,49 @@
+name: Bug report / 问题反馈
+description: Something does not work as expected / 功能不符合预期
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Never post seed phrases, login QR codes, API keys, full wallet addresses or screenshots that show them.** Security issues go to security@piupiuagent.xyz, not here.
+        **请勿贴助记词、登录二维码、密钥、完整钱包地址或包含它们的截图。** 安全问题请发邮件到 security@piupiuagent.xyz，不要在这里提交。
+  - type: input
+    id: version
+    attributes:
+      label: Version / 版本
+      description: Settings → Appearance → Version, or the commit if running from source / 设置 → 外观 → 版本；从源代码运行请写提交号
+    validations:
+      required: true
+  - type: dropdown
+    id: build
+    attributes:
+      label: Build / 版本类型
+      options: [Installer (official) / 安装版, From source (open-source build) / 从源代码运行]
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: OS / 系统
+      options: [macOS (Apple silicon), macOS (Intel), Windows 10, Windows 11, Linux]
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what did you expect? / 发生了什么，你期望的结果是什么
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce / 复现步骤
+      placeholder: "1. …\n2. …"
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Error message or logs / 报错或日志
+      description: Remove addresses and personal data first / 先去掉地址等个人信息
+      render: text

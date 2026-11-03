@@ -45,47 +45,57 @@ export class GangFun extends EventEmitter {
     return res.json();
   }
 
+  // 列表分五类：老盘 + 股票盘（股票盘按老盘返回的 BNB 价格换算，所以这两类先后拉）、V3、打新、铸币飞轮。
+  // 五类同时拉，拉到一类就先交出去（以前一页一页顺序拉、全部拉完才一次性交出，启动后战壕要等 20 秒左右才有 Gang 的币）；
+  // 一次交出上千个币时每 100 个让出一次主线程，不让界面和行情推送卡住
+  async pages(path, map, step = 100) {
+    const out = [];
+    for (let off = 0; off < 1000;) {
+      const j = await this.get(`${path}${path.includes('?') ? '&' : '?'}limit=${step}&offset=${off}`);
+      for (const x of j.items || []) out.push(map ? map(x) : x);
+      if (!j.hasMore || !j.nextOffset) break; off = j.nextOffset;
+    }
+    return out;
+  }
+  async emitItems(items, first) {
+    for (let k = 0; k < items.length; k++) {
+      const it = items[k];
+      const isNew = !first && !this.seen.has(it.address);
+      this.emit('token', it, { isNew });
+      if (!this.seen.has(it.address)) this.seen.set(it.address, -1);
+      if (k % 100 === 99) await new Promise((r) => setImmediate(r));
+    }
+  }
+
   async loopList() {
     let first = true;
     for (;;) {
       const t0 = Date.now();
-      try {
-        const items = [];
-        for (let off = 0; off < 1000;) { const j = await this.get(`/tokens?sort=new&limit=200&offset=${off}`); items.push(...(j.items || [])); if (!j.hasMore) break; off = j.nextOffset; }
-        this.bnbUsd = Number(items[0]?.bnbUsd) || this.bnbUsd;
-        for (let off = 0; off < 1000;) {
-          const j = await this.get(`/stocks/tokens?limit=100&offset=${off}`);
-          for (const x of j.items || []) items.push(this.fromV2(x));
-          if (!j.hasMore) break; off = j.nextOffset;
-        }
+      const cats = [
+        async () => {
+          const legacy = await this.pages('/tokens?sort=new', null, 200);
+          this.bnbUsd = Number(legacy[0]?.bnbUsd) || this.bnbUsd;
+          await this.emitItems(legacy, first);
+          const stocks = await this.pages('/stocks/tokens', (x) => this.fromV2(x));
+          await this.emitItems(stocks, first);
+          return legacy.length + stocks.length;
+        },
         // V3（10-27 合并后的新发射）：链上事件只能看到服务启动之后的新盘，之前发的、已毕业的靠这个列表补全
-        for (let off = 0; off < 1000;) {
-          const j = await this.get(`/v3/tokens?status=all&limit=100&offset=${off}`).catch(() => null);
-          if (!j) break;
-          for (const x of j.items || []) items.push(this.fromV3(x));
-          if (!j.hasMore || !j.nextOffset) break; off = j.nextOffset;
-        }
-        // 打新（固定价认购）：和 V3 曲线币同一个合约、不同的列表（/fair/sales）；认购中的显示在新创建 / 即将打满，认购满开盘后进已开盘
-        for (let off = 0; off < 1000;) {
-          const j = await this.get(`/fair/sales?status=all&limit=100&offset=${off}`).catch(() => null);
-          if (!j) break;
-          for (const x of j.items || []) items.push(this.fromFair(x));
-          if (!j.hasMore || !j.nextOffset) break; off = j.nextOffset;
-        }
-        // 铸币飞轮：开盘前按份铸造（显示在新创建 / 即将打满，进度 = 已铸份数 / 10000），开盘后进已开盘
-        for (let off = 0; off < 1000;) {
-          const j = await this.get(`/fly/tokens?status=all&limit=100&offset=${off}`).catch(() => null);
-          if (!j) break;
-          for (const x of j.items || []) items.push(this.fromFly(x));
-          if (!j.hasMore || !j.nextOffset) break; off = j.nextOffset;
-        }
-        for (const it of items) {
-          const isNew = !first && !this.seen.has(it.address);
-          this.emit('token', it, { isNew });
-          if (!this.seen.has(it.address)) this.seen.set(it.address, -1);
-        }
-        this.status.total = items.length; this.status.connected = true; this.status.lastError = null; first = false; rlNote(this.status, null);
-      } catch (e) { this.status.connected = false; this.status.lastError = e.message; rlNote(this.status, e); }
+        async () => { const v = await this.pages('/v3/tokens?status=all', (x) => this.fromV3(x)); await this.emitItems(v, first); return v.length; },
+        // 打新（固定价认购）：认购中的显示在新创建 / 即将打满，认购满开盘后进已开盘
+        async () => { const v = await this.pages('/fair/sales?status=all', (x) => this.fromFair(x)); await this.emitItems(v, first); return v.length; },
+        // 铸币飞轮：开盘前按份铸造（进度 = 已铸份数 / 10000），开盘后进已开盘
+        async () => { const v = await this.pages('/fly/tokens?status=all', (x) => this.fromFly(x)); await this.emitItems(v, first); return v.length; },
+      ];
+      const res = await Promise.allSettled(cats.map((f) => f()));
+      const errs = res.filter((r) => r.status === 'rejected').map((r) => r.reason);
+      if (errs.length < res.length) {
+        this.status.total = res.reduce((n, r) => n + (r.status === 'fulfilled' ? r.value : 0), 0);
+        this.status.connected = true;
+        if (first) this.emit('listReady');
+        first = false;
+      } else this.status.connected = false;
+      this.status.lastError = errs.length ? errs[0].message : null; rlNote(this.status, errs[0] || null);
       this.status.lastPollMs = Date.now() - t0;
       await sleep(this.status.intervalMs || LIST_MS);
     }

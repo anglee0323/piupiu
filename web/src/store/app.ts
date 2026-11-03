@@ -19,6 +19,8 @@ interface AppState {
   block: number
   bnbUsd: number
   startedAt: number | null   // 后台服务的启动时间（毫秒），启动后的头几秒界面显示「正在同步行情」
+  // 后台报告首批行情已到齐（旧版后台没有这个字段：null，按启动时间等）
+  warm: boolean | null
   net: NetStatus | null
   wallets: WalletView[]
   slots: SlotsInfo | null          // 页面列表用：不含扫码没完成的空槽位
@@ -63,7 +65,7 @@ const lc = (a?: string | null) => String(a || '').toLowerCase()
 const splitSlots = (x?: SlotsInfo | null) => ({ slotsAll: x || null, slots: x ? { ...x, slots: x.slots.filter((s) => !s.fresh) } : null })
 
 export const useApp = create<AppState>((set, get) => ({
-  ready: false, wsOk: false, wsDownAt: null, startedAt: null, mode: 'live', baw: null, block: 0, bnbUsd: 0, net: null, wallets: [], slots: null, slotsAll: null, settings: null, feeRate: 0,
+  ready: false, wsOk: false, wsDownAt: null, startedAt: null, mode: 'live', baw: null, block: 0, bnbUsd: 0, net: null, wallets: [], slots: null, slotsAll: null, settings: null, feeRate: 0, warm: null,
   tokens: new Map(), holdings: null, orders: [], flow: [], favorites: { groups: ['默认'], items: {} }, blocklist: { tokens: {}, devs: {} },   // i18n-ignore（「默认」是分组名，数据值）
   names: {}, namesVer: -1, detail: null, subToken: null, newTokens: new Set(), track: { targets: [], groups: ['默认'], feed: [] }, toasts: [], cond: [], radarHit: null, radar: null as RadarView | null, nft: null, radarTick: null,   // i18n-ignore
 
@@ -188,7 +190,7 @@ function onMsg(m: { type: string; full?: boolean; seq?: number; data: any }) {
         for (const t of ups) { const k = lc(t.address); if (prev.size && !prev.has(k)) { if (fresh === S.newTokens) fresh = new Set(S.newTokens); fresh.add(k) } next.set(k, t) }
         for (const k of dels) next.delete(k)
       }
-      useApp.setState({ startedAt: d.startedAt ?? null, mode: d.mode, baw: d.baw, block: d.block, bnbUsd: d.bnbUsd, net: d.net, wallets: d.wallets, ...(d.slots ? splitSlots(d.slots) : {}), ...(next !== prev ? { tokens: next } : {}), ...(fresh !== S.newTokens ? { newTokens: fresh } : {}) })
+      useApp.setState({ startedAt: d.startedAt ?? null, warm: d.warm ?? null, mode: d.mode, baw: d.baw, block: d.block, bnbUsd: d.bnbUsd, net: d.net, wallets: d.wallets, ...(d.slots ? splitSlots(d.slots) : {}), ...(next !== prev ? { tokens: next } : {}), ...(fresh !== S.newTokens ? { newTokens: fresh } : {}) })
       break
     }
     case 'wallets': useApp.setState(splitSlots(m.data)); break

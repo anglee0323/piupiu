@@ -79,8 +79,10 @@ export function useWidth<T extends HTMLElement>() {
 export const WARMUP_MS = 12_000
 export function WarmGate({ children }: { children: ReactNode }) {
   const startedAt = useApp((s) => s.startedAt)
+  const warm = useApp((s) => s.warm)
   const [, tick] = useState(0)
-  const left = startedAt ? startedAt + WARMUP_MS - Date.now() : 0
+  // 后台说首批行情到齐了就立即显示；否则（旧版后台）按启动后 12 秒
+  const left = warm || !startedAt ? 0 : startedAt + WARMUP_MS - Date.now()
   useEffect(() => { if (left <= 0) return; const h = setTimeout(() => tick((x) => x + 1), left + 50); return () => clearTimeout(h) }, [left])
   if (left > 0) return <div className="h-full grid place-items-center text-t3"><span className="flex items-center gap-2"><Loader2 className="ico spin" />{T('warm.syncing')}</span></div>
   return <>{children}</>
