@@ -1,0 +1,41 @@
+# 每次推送在 Linux 和 Windows 上各跑一遍：装依赖 → 后端测试 → 构建界面 → 模拟盘冒烟。
+# Windows 覆盖跨平台兼容（baw 的调用方式、路径、npm 脚本）；真实钱包登录 / 下单仍需真机验证
+# 为省免费额度（私有仓库每月 2000 分钟，Windows 按 2 倍、macOS 按 10 倍算）：每次推送只跑 Linux；
+# Windows 只在改到跨平台相关的文件（桌面外壳、钱包命令行调用、运行时、脚本、依赖）时跑，另外每周一跑一次兜底；
+# 同一分支的旧运行会被新推送取消；只改文档不触发。
+name: CI
+on:
+  push:
+    branches: [main]
+    paths-ignore: ['**.md', 'docs/**']
+  pull_request:
+    paths-ignore: ['**.md', 'docs/**']
+  schedule:
+    - cron: '40 3 * * 1'   # 每周一跑一次 Linux + Windows
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ${{ fromJSON((github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && '["ubuntu-latest","windows-latest"]' || '["ubuntu-latest"]') }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            web/package-lock.json
+      - run: npm install
+      - run: npm test
+      - run: npm run web:build
+      - run: node scripts/smoke.mjs

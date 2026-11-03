@@ -1,0 +1,27 @@
+{
+ "name": "piupiu",
+ "version": "3.3.19",
+ "description": "Piupiu：本地自用的 BSC Agent ID 内盘交易终端（Flap / Four / gang.fun），GMGN 式界面，通过币安 Agentic Wallet（baw）下单",
+ "main": "server.js",
+ "type": "module",
+ "scripts": {
+  "start": "node server.js",
+  "dev": "node --watch server.js",
+  "live": "node scripts/with-mode.mjs MODE=live",
+  "live:8788": "node scripts/with-mode.mjs MODE=live LIVE_TRADE=1 GANG_V3_TRADE=1 AUTO_TRANSFER_FOUR=0 PORT=8788",
+  "quote:8788": "node scripts/with-mode.mjs MODE=live LIVE_TRADE=0 AUTO_TRANSFER_FOUR=0 PORT=8788",
+  "sim:8787": "node scripts/with-mode.mjs MODE=sim PORT=8787",
+  "test": "node --test \"engine/**/*.test.js\" \"shared/**/*.test.js\" \"desktop/*.test.js\"",
+  "testnet:info": "node scripts/testnet-info.js",
+  "watch:four": "node scripts/watch-four.js",
+  "web:build": "npm --prefix web install && npm --prefix web run build",
+  "web:dev": "npm --prefix web run dev"
+ },
+ "dependencies": {
+  "@noble/curves": "1.2.0",
+  "ethers": "6.17.0",
+  "express": "5.1.0",
+  "ws": "8.18.3"
+ },
+ "license": "SEE LICENSE IN LICENSE"
+}

@@ -1,0 +1,8 @@
+{
+  "name": "piupiu-baw-runtime",
+  "private": true,
+  "description": "安装版首次启动时，用这份清单 + package-lock.json 从 npm 官方源把币安钱包命令行装到用户目录（npm ci 会逐个核对 integrity）。版本升级见 engine/live/runtime/manifest.json",
+  "dependencies": {
+    "@binance/agentic-wallet": "1.12.0"
+  }
+}

@@ -1,0 +1,83 @@
+{
+  "name": "piupiu-desktop",
+  "productName": "Piupiu",
+  "version": "0.1.9",
+  "private": true,
+  "description": "Piupiu 桌面版：启动本机 Gateway（server.js）并打开交易界面",
+  "main": "main.cjs",
+  "scripts": {
+    "stage": "node stage.mjs",
+    "start": "node stage.mjs && electron .",
+    "dist": "node ../scripts/release.mjs build"
+  },
+  "devDependencies": {
+    "electron": "^45.1.0",
+    "electron-builder": "^26.18.0",
+    "npm": "^10.9.9"
+  },
+  "build": {
+    "appId": "app.piupiu.terminal",
+    "productName": "Piupiu",
+    "copyright": "Piupiu",
+    "directories": {
+      "output": "dist",
+      "buildResources": "resources"
+    },
+    "files": [
+      "main.cjs",
+      "preload.cjs",
+      "updater.cjs",
+      "update-pubkey.pem",
+      "package.json",
+      "icons/*.png"
+    ],
+    "asar": true,
+    "icon": "resources/icon.png",
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
+      ],
+      "category": "public.app-category.finance",
+      "identity": "-",
+      "hardenedRuntime": false
+    },
+    "dmg": {
+      "title": "Piupiu ${version}"
+    },
+    "win": {
+      "icon": "resources/icon-win.png",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": false,
+      "artifactName": "Piupiu-Setup-${version}.${ext}"
+    },
+    "publish": null,
+    "electronLanguages": [
+      "zh_CN",
+      "zh_TW",
+      "en"
+    ],
+    "afterPack": "after-pack.cjs"
+  },
+  "piupiu": {
+    "updateBase": "",
+    "moveTo": "",
+    "site": "https://piupiuagent.xyz/"
+  }
+}

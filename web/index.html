@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Piupiu</title>
+    <script>
+      // 首屏主题：本机 Gateway 已在 html 标签上写好 data-theme；在线体验（静态页）没有 Gateway，按浏览器里保存的设置，没有就默认黑暗，避免先白后黑
+      (function () { var d = document.documentElement; if (d.getAttribute('data-theme')) return; var t = 'dark'; try { var s = JSON.parse(localStorage.getItem('terminal-prefs') || '{}').state; if (s && s.theme === 'light') t = 'light'; } catch (e) {} d.setAttribute('data-theme', t); })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

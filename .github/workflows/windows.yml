@@ -1,0 +1,26 @@
+# Windows 兼容：只在改到跨平台相关的文件时跑（Windows 按 2 倍计费）。完整的 Linux 测试在 ci.yml；ci.yml 每周一也会跑一次 Windows 兜底
+name: Windows
+on:
+  push:
+    branches: [main]
+    paths: ['desktop/**', 'engine/live/baw.js', 'engine/live/baw-profile/**', 'engine/live/runtime.js', 'engine/live/runtime/**', 'engine/live/config.js', 'scripts/**', 'server.js', 'package.json', 'package-lock.json', '.github/workflows/windows.yml']
+concurrency:
+  group: win-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  test:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            web/package-lock.json
+      - run: npm install
+      - run: npm test
+      - run: npm run web:build
+      - run: node scripts/smoke.mjs

@@ -1,0 +1,233 @@
+@import "tailwindcss";
+
+/* 设计令牌。两套主题（<html data-theme>）：
+ *   dark  （黑暗）—— 深色，配色取自 gmgn.ai 暗色主题的实际计算样式（下面 @theme 里的默认值）
+ *   light （明亮，默认）—— 暖白纸色，和官网一致（下面 [data-theme="light"] 覆盖同名变量）
+ * 组件里只用这些令牌（bg-card、text-t2、text-on-accent…），不要写死颜色，否则换主题时会漏掉。 */
+@font-face { font-family: "Geist"; src: url("/fonts/Geist-Variable.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
+/* 品牌字标（Libre Baskerville Bold，OFL） */
+@font-face { font-family: "Piupiu Serif"; src: url("/fonts/LibreBaskerville-Bold.woff2") format("woff2"); font-weight: 700; font-display: swap; }
+/* GMGN 图标字体（自用，取自 gmgn.ai），见 components/gi.tsx */
+@font-face { font-family: "Geist Mono"; src: url("/fonts/GeistMono-Variable.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
+
+@theme {
+  --font-sans: "Geist", "PingFang SC", "Microsoft YaHei", -apple-system, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, Menlo, monospace;
+
+  --color-bg: #121212;          /* 页面底色 */
+  --color-bg-deep: #0d0d0d;     /* 顶栏 / 底栏 */
+  --color-card: #171717;        /* 面板 */
+  --color-card-2: #1c1c1c;
+  --color-btn: #1f1f1f;         /* 次级按钮 / 输入框 */
+  --color-btn-2: #242424;
+  --color-hover: #1d1d1d;
+  --color-hover-2: #262626;
+  --color-line: #242424;        /* 分隔线 */
+  --color-line-2: #2e2e2e;
+  --color-line-3: #3a3a3a;
+
+  --color-t1: #f5f5f5;          /* 正文 */
+  --color-t2: #cccccc;          /* 次要 */
+  --color-t3: #808080;          /* 弱化 */
+  --color-t4: #525252;          /* 更弱 */
+
+  --color-up: #46b87d;          /* 涨 / 买 */
+  --color-buy: #69cf8d;         /* 买入强调 */
+  --color-down: #de5759;        /* 跌 / 卖 */
+  --color-warn: #f8b951;        /* 黄：时间、警告 */
+  --color-vol: #46cbf0;         /* 成交量 V */
+  --color-link: #4ea7fa;
+  --color-violet: #9869ff;
+  --color-orange: #ff9839;
+
+  --color-on-accent: #1a1a1a;   /* 彩色按钮（bg-up / bg-buy / bg-down…）上的文字 */
+  --color-solid: #f3f3f3;       /* 高对比实心按钮（筛选面板「应用」等） */
+  --color-on-solid: #1a1a1a;
+  --color-brand: #f0eee8;       /* 顶栏字标 */
+  --color-overlay: rgb(0 0 0 / .65);   /* 弹窗背后的遮罩 */
+
+  --color-flap: #9869ff;        /* 平台角标 */
+  --color-four: #5fe36a;   /* Four 官方 logo 的绿（logo 是 #27d7d6 → #76f951 渐变） */
+  --color-gang: #fcd535;
+
+  --text-2xs: 10px;
+  --text-xs: 11px;
+  --text-sm: 12px;
+  --text-base: 13px;
+  --text-md: 14px;
+  --text-lg: 16px;
+  --text-xl: 18px;
+  --text-2xl: 22px;
+
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+}
+
+/* 非颜色的主题变量：阴影、K 线图（PriceChart 运行时读取） */
+:root {
+  color-scheme: dark;
+  --shadow-pop: 0 16px 48px rgba(0, 0, 0, .55);
+  --chart-text: #808080; --chart-grid: #1f1f1f; --chart-cross: #3a3a3a; --chart-label: #2e2e2e; --chart-border: #242424;
+  --chart-up: #1cb069; --chart-down: #de4e52;
+}
+
+/* 明亮主题（默认）：暖白纸色、墨黑文字，绿 / 红加深到浅底上也清楚 */
+:root[data-theme="light"] {
+  color-scheme: light;
+  --color-bg: #f4f2ec;
+  --color-bg-deep: #faf9f6;
+  --color-card: #fdfcf9;
+  --color-card-2: #f7f5f0;
+  --color-btn: #efece5;
+  --color-btn-2: #e6e2d9;
+  --color-hover: #f3f1eb;
+  --color-hover-2: #e9e5dc;
+  --color-line: #e8e4da;
+  --color-line-2: #dcd7cb;
+  --color-line-3: #c6c0b2;
+  --color-t1: #1b1b1a;
+  --color-t2: #45443f;
+  --color-t3: #7b7870;
+  --color-t4: #a8a49a;
+  --color-up: #1b9658;
+  --color-buy: #22a262;
+  --color-down: #d4443d;
+  --color-warn: #b5740a;
+  --color-vol: #1286ae;
+  --color-link: #2b69d2;
+  --color-violet: #7549dc;
+  --color-orange: #d26f10;
+  --color-on-accent: #ffffff;
+  --color-solid: #1b1b1a;
+  --color-on-solid: #ffffff;
+  --color-brand: #1b1b1a;
+  --color-overlay: rgb(38 32 18 / .3);
+  --color-flap: #7549dc;
+  --color-four: #1f9d4c;
+  --color-gang: #c49204;
+  --shadow-pop: 0 14px 36px rgba(48, 38, 12, .14), 0 1px 3px rgba(48, 38, 12, .08);
+  --chart-text: #7b7870; --chart-grid: #eeebe4; --chart-cross: #c6c0b2; --chart-label: #45443f; --chart-border: #e8e4da;
+  --chart-up: #1b9658; --chart-down: #d4443d;
+}
+
+@layer base {
+  html, body, #root { height: 100%; }
+  body {
+    margin: 0; background: var(--color-bg); color: var(--color-t1);
+    font-family: var(--font-sans); font-size: 12px; line-height: 1.45;
+    font-feature-settings: "tnum" 1; -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+  }
+  button { cursor: pointer; }
+  button:disabled { cursor: not-allowed; }
+  /* 焦点框：鼠标点击不显示；键盘操作时用主题色细框，代替浏览器默认的蓝框 */
+  :focus { outline: none; }
+  :focus-visible { outline: 1px solid var(--color-line-3); outline-offset: 1px; }
+  input:focus-visible { outline: none; }
+  input { outline: none; background: transparent; min-width: 0; }
+  input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+  ::selection { background: color-mix(in oklab, var(--color-up) 35%, transparent); }
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-thumb { background: var(--color-line-2); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--color-line-3); }
+  ::-webkit-scrollbar-track { background: transparent; }
+}
+
+@layer components {
+  /* 线性图标统一规格：GMGN 是 14–16px、描边约 1.5、灰色、悬停变白 */
+  .ico { width: 14px; height: 14px; stroke-width: 1.6; flex: none; }
+  .ico-sm { width: 12px; height: 12px; stroke-width: 1.7; flex: none; }
+  .ico-md { width: 16px; height: 16px; stroke-width: 1.6; flex: none; }
+
+  .icon-btn { display: inline-flex; align-items: center; justify-content: center; color: var(--color-t3); border-radius: var(--radius-xs); transition: color .12s, background .12s; }
+  .icon-btn:hover { color: var(--color-t1); background: var(--color-btn-2); }
+
+  /* 分段切换（P1/P2/P3、周期等） */
+  /* 滑动条（铸币飞轮份数等）：已选部分用买入色填充（--p = 已选百分比），拇指圆点，拖动时放大 */
+  .range { -webkit-appearance: none; appearance: none; width: 100%; height: 20px; background: transparent; cursor: pointer; }
+  .range:focus { outline: none; }
+  .range::-webkit-slider-runnable-track { height: 6px; border-radius: 999px; background: linear-gradient(to right, var(--color-buy) 0 var(--p, 0%), var(--color-btn-2) var(--p, 0%) 100%); }
+  .range::-moz-range-track { height: 6px; border-radius: 999px; background: var(--color-btn-2); }
+  .range::-moz-range-progress { height: 6px; border-radius: 999px; background: var(--color-buy); }
+  .range::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; margin-top: -6px; border-radius: 50%; background: var(--color-buy); border: 3px solid var(--color-card); box-shadow: 0 0 0 1px var(--color-buy); transition: transform .12s; }
+  .range::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: var(--color-buy); border: 3px solid var(--color-card); box-shadow: 0 0 0 1px var(--color-buy); }
+  .range:active::-webkit-slider-thumb, .range:hover::-webkit-slider-thumb { transform: scale(1.15); }
+  .range:disabled { opacity: .45; cursor: default; }
+  .seg { display: inline-flex; align-items: stretch; gap: 2px; padding: 2px; border-radius: var(--radius-xs); background: var(--color-btn); }
+  .seg > button { padding: 0 6px; border-radius: var(--radius-xs); color: var(--color-t3); font-size: 12px; font-weight: 500; transition: color .12s, background .12s; }
+  .seg > button:hover { color: var(--color-t1); }
+  .seg > button[data-on="true"] { background: var(--color-btn-2); color: var(--color-buy); }
+
+  .input-box { display: flex; align-items: center; gap: 6px; border-radius: var(--radius-sm); background: var(--color-btn); border: 1px solid transparent; transition: border-color .12s; }
+  .input-box:focus-within { border-color: var(--color-line-3); }
+
+  /* 卡片头像左上角的小按钮：鼠标停在头像上才出现（和 GMGN 一样），20×20 */
+  .side-btn { width: 20px; height: 20px; display: grid; place-items: center; border-radius: 4px; background: var(--color-btn-2); color: var(--color-t2); opacity: 0; pointer-events: none; transition: opacity .12s, color .12s; }
+  .av-wrap:hover .side-btn { opacity: 1; pointer-events: auto; }
+  .side-btn:hover { color: var(--color-t1); }
+  /* 顶部条切换 收藏 / 持仓 / 最近浏览：内容淡入，不是硬切 */
+  .strip-in { animation: strip-in .16s ease-out; }
+  @keyframes strip-in { from { opacity: 0; transform: translateY(2px); } to { opacity: 1; transform: none; } }
+  .chip { display: inline-flex; align-items: center; gap: 3px; height: 20px; padding: 0 6px; border-radius: var(--radius-xs); border: 1px solid var(--color-line-2); color: var(--color-t2); font-size: 11px; white-space: nowrap; flex: none; }
+
+  .tab { position: relative; height: 100%; display: inline-flex; align-items: center; color: var(--color-t3); font-size: 14px; font-weight: 500; transition: color .12s; white-space: nowrap; }
+  .tab:hover { color: var(--color-t2); }
+  .tab[data-on="true"] { color: var(--color-t1); }
+  .tab[data-on="true"]::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: var(--color-t1); border-radius: 1px; }
+
+  /* 宽表在卡片里自己横滚（页面不被撑出滚动条）；overflow-y: clip 让表头的吸顶仍相对页面滚动生效 */
+  .tbl-x { overflow-x: auto; overflow-y: clip; }
+  .tbl-x > .tbl { min-width: max-content; }
+  .tbl { width: 100%; border-collapse: collapse; }
+  .tbl th { position: sticky; top: 0; z-index: 1; background: var(--color-card); color: var(--color-t3); font-weight: 400; font-size: 12px; text-align: right; padding: 8px 10px; white-space: nowrap; }
+  .tbl td { padding: 7px 10px; border-top: 1px solid var(--color-line); text-align: right; white-space: nowrap; font-size: 12px; }
+  .tbl th:first-child, .tbl td:first-child, .tbl .l { text-align: left; }
+  /* 首列 / 末列和卡片内容（px-4 = 16px）对齐：标题、说明、页签和表格的左右边缘在同一条线上 */
+  .tbl th:first-child, .tbl td:first-child { padding-left: 16px; }
+  .tbl th:last-child, .tbl td:last-child { padding-right: 16px; }
+  .tbl tbody tr:hover td { background: var(--color-hover); }
+
+  .scroll-y { overflow-y: auto; overscroll-behavior: contain; }
+  /* 不显示滚动条（滚轮 / 触控板照常滚动）：战壕三列和 GMGN 一样不露滚动条 */
+  .no-sb { scrollbar-width: none; }
+  .no-sb::-webkit-scrollbar { display: none; }
+  .pop { background: var(--color-card); border: 1px solid var(--color-line-2); border-radius: var(--radius-md); box-shadow: var(--shadow-pop); }
+}
+
+/* 链接和图片不能被拖起来：按住标签再稍微一动，系统会把链接当成「拖拽」，出现带 127.0.0.1:端口 的悬浮条和禁止图标，
+   这一下点击也不会生效，还会让两个标签同时处于选中样式（Windows 上最明显）。不放进 @layer，避免被工具类盖掉 */
+a, img { -webkit-user-drag: none; user-drag: none; }
+
+/* mac 桌面版：系统标题栏隐藏，顶栏兼做标题栏——左边给红绿灯留位置，空白处可拖动窗口，控件照常点击。
+   不放进 @layer：要压过顶栏自己的 px-4（层里的样式优先级低于工具类，放在 base 里时这条不生效） */
+/* 红绿灯的位置留在左段里（不放在整个顶栏的内边距上，否则搜索框会偏离窗口中线）：88px 减去顶栏自身的 16px */
+.mac-shell .tb-left { padding-left: 72px; }
+.mac-shell .app-titlebar { -webkit-app-region: drag; }
+/* Windows：最小化 / 最大化 / 关闭按钮由系统叠在右侧（env(titlebar-area-*) 是它们之外的区域），顶栏右边留出位置、空白处可拖动窗口 */
+.win-shell .app-titlebar { -webkit-app-region: drag; }
+/* 旧外壳（0.1.5 / 0.1.6，系统叠加按钮）：按钮的位置留在右段里 */
+.win-shell:not(.win-own) .tb-right { padding-right: calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100vw) - 8px); }
+/* 只有顶栏空白处能拖动窗口：导航、搜索、右侧控件整块都不参与拖动（Windows 上按在拖动区域里会进入系统的移动窗口状态，
+   点在两个标签之间的缝隙时点击被吞掉，切换显得卡顿） */
+:is(.mac-shell, .win-shell) .app-titlebar :is(.tb-nd, a, button, input, select, [role=button], .pop) { -webkit-app-region: no-drag; }
+
+/* gang.fun 押金承诺（战壕卡片）：整张卡片铺一层渐变底色（左深右浅），颜色和卡片里的「押金」标签一致；没有色条，不改布局。
+   绿 = 押金全覆盖，黄 = 押金（50–100%），红 = 违约 / 已罚没，灰 = 未达认证标准或还没开盘（只上很淡的灰底） */
+.bond-card { background-image: linear-gradient(100deg, color-mix(in srgb, var(--bond-c) var(--bond-a, 16%), transparent), color-mix(in srgb, var(--bond-c) 4%, transparent)); }
+.bond-up { --bond-c: var(--color-up); }
+.bond-warn { --bond-c: var(--color-warn); }
+.bond-down { --bond-c: var(--color-down); --bond-a: 18%; }
+.bond-gray { --bond-c: var(--color-t3); --bond-a: 9%; }
+
+@keyframes flash-in { from { background: color-mix(in oklab, var(--color-buy) 12%, transparent); } to { background: transparent; } }
+.flash-in { animation: flash-in 1.6s ease-out; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.spin { animation: spin .8s linear infinite; }
+@keyframes toast-in { from { transform: translateY(8px); opacity: 0; } }
+.toast-in { animation: toast-in .18s ease-out; }
+
+/* 数字输入框不要上下箭头（单位写在框里） */
+input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+input[type=number] { -moz-appearance: textfield; }

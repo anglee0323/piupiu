@@ -1,0 +1,21 @@
+{
+  "_说明": "安装版首次启动时从官方源获取、不随安装包分发的依赖（许可证不允许再分发）。升级：跑 node scripts/check-runtime-updates.mjs 看上游有没有新版，按它的提示改这里并重新生成 baw/package-lock.json，发新版 App；用户那边 Gateway 启动时发现不一致会在后台换新。",
+  "baw": {
+    "_说明": "币安钱包命令行。supported = 核对过钥匙串存法（多钱包隔离可用）的版本，必须和 engine/live/baw-profile/hook.mjs 的 KNOWN 一致；用户自己全局装的版本在这里面就直接用，否则用我们装在用户目录里的 version",
+    "package": "@binance/agentic-wallet",
+    "version": "1.12.0",
+    "supported": ["1.11.0", "1.12.0"],
+    "registries": ["https://registry.npmjs.org/", "https://registry.npmmirror.com/"]
+  },
+  "fourScript": {
+    "_说明": "four.meme Agent 专属内盘的报价 / 生成交易脚本（币安官方技能 binance-skills-hub，仓库没有许可证，不能打包），锁定提交 + 文件指纹",
+    "repo": "binance/binance-skills-hub",
+    "commit": "516289beddfceef2382482b8df7f5ca1a98f501d",
+    "path": "skills/binance-web3/binance-agentic-wallet/scripts/agent-id-exclusive-token-launches.mjs",
+    "sha256": "15044335adc228286424988495e81f58343e7fe33e2b1f2f3946fe3f5627066a",
+    "urls": [
+      "https://raw.githubusercontent.com/{repo}/{commit}/{path}",
+      "https://cdn.jsdelivr.net/gh/{repo}@{commit}/{path}"
+    ]
+  }
+}
