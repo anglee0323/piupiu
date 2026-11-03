@@ -39,7 +39,7 @@ Piupiu 在你的电脑上运行一个本机服务（Gateway），界面在它之
 ```bash
 git clone https://github.com/anglee0323/piupiu.git && cd piupiu
 npm install && npm run web:build
-cp .env.example .env
+cp .env.example .env    # 然后在 .env 中填写 RPC_URL（BSC 节点）
 npm run quote:8788   # 实盘行情、只报价；打开 http://127.0.0.1:8788
 ```
 
