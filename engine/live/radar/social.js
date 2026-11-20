@@ -14,7 +14,10 @@ const ERR_TTL = 5 * 60_000;   // 失败的结果只缓存 5 分钟：不要一�
 const lc = (a) => String(a || '').toLowerCase();
 const norm = (s) => lc(s).replace(/[^a-z0-9\u4e00-\u9fff]/g, '');
 const file = (a) => dataFile(`radar/social/${lc(a)}.json`);
-export const socialEnabled = () => !!process.env.CRAWLERHUB_API_KEY;
+// 已停用（2026-11-13）：CrawlerHub 的 tweet/advanced_search 已下线（返回 410），这个功能的 Key 也已失效（401）。
+// 停用期间不发任何请求，雷达只给「在 X 上搜」的跳转链接。要恢复：改用 CrawlerHub 的 grok/search 重写查询，再把它改回 false
+export const SOCIAL_RETIRED = true;
+export const socialEnabled = () => !SOCIAL_RETIRED && !!process.env.CRAWLERHUB_API_KEY;
 export const xSearchUrl = (q) => `https://x.com/search?q=${encodeURIComponent(q)}&f=live`;
 
 // ---------- 本机调用计数（按天） ----------
@@ -64,6 +67,7 @@ const inflight = new Map();   // 同一个合约并发查（详情 + 列表同�
 
 /** names：候选名字（元数据名 / 合约名 / 代号），按顺序试；force = 忽略缓存 */
 export async function socialInfo(address, names, { force = false, knownHandles = [] } = {}) {
+  if (SOCIAL_RETIRED) return null;
   const a = lc(address);
   if (!force) {
     try { const c = JSON.parse(readFileSync(file(a), 'utf8')); const ttl = c.error && !c.count ? ERR_TTL : TTL; if (c.v === 4 && Date.now() - c.at < ttl) return c; } catch { /* 没缓存 */ }

@@ -13,6 +13,8 @@ export const FEE_BPS = 50n;                                   // 0.5%
 export const FEE_RATE = Number(FEE_BPS) / 10000;
 // 收款合约（部署后填入）。为空 = 不收费（开源版、未部署前）
 export const FEE_CONTRACT = '';   // 开源版不收手续费
+// V2：只收 Agent ID 持有者的手续费（链上检查 balanceOf(付款钱包) > 0，contracts/PiupiuFeeV2.sol）。为空 = 全部走 V1
+export const FEE_CONTRACT_V2 = '';
 export const FEE_TREASURY = '0xAD11aE703dFfDED3ad7caE72871BDCD44EF58CA2';
 export const FEE_MIN_WEI = 20_000_000_000_000n;              // 0.00002 BNB：手续费不足这个数就不收（≈ 卖出 0.004 BNB 以下）
 const PAY_IDLE_MS = 20_000;                                   // 钱包空闲这么久才付
@@ -38,8 +40,8 @@ export class Fees {
    * @param {(slot:number) => boolean} o.busy  钱包是否正在下单
    * @param {(slot:number) => {address?:string, bnb?:number}|null} o.wallet  当前钱包（地址、BNB 余额）
    */
-  constructor({ enabled, send, busy = () => false, wallet = () => null, file = dataFile('fees.jsonl'), contract = FEE_CONTRACT, log = () => {}, onNotice = () => {} } = {}) {
-    this.enabled = !!(enabled && contract); this.contract = contract; this.send = send; this.busy = busy; this.wallet = wallet;
+  constructor({ enabled, send, busy = () => false, wallet = () => null, file = dataFile('fees.jsonl'), contract = FEE_CONTRACT, contractV2 = FEE_CONTRACT_V2, log = () => {}, onNotice = () => {} } = {}) {
+    this.enabled = !!(enabled && contract); this.contract = contract; this.contractV2 = contractV2 || ''; this.send = send; this.busy = busy; this.wallet = wallet;
     this.file = file; this.log = log; this.onNotice = onNotice;
     this.rows = []; this.timers = new Map(); this.fails = new Map(); this.paying = new Set();
     try { if (existsSync(file)) for (const l of readFileSync(file, 'utf8').split('\n')) { if (!l.trim()) continue; try { this.rows.push(JSON.parse(l)); } catch { /* 坏行跳过 */ } } } catch { /* 读不了就从空开始 */ }
@@ -64,6 +66,8 @@ export class Fees {
     const t = setTimeout(() => { this.timers.delete(slot); this.pay(slot).catch((e) => this.log(`手续费付款出错：${e.message}`)); }, ms);
     t.unref?.(); this.timers.set(slot, t);
   }
+  /** 这个钱包的手续费付到哪：已确认持有 Agent ID → V2（链上校验）；没有、或还没查清 → V1（和以前一样） */
+  payTo(w) { return this.contractV2 && w?.agentId ? this.contractV2 : this.contract; }
   async pay(slot) {
     if (!this.enabled || this.paying.has(slot)) return null;
     if (this.busy(slot)) { this.schedule(slot); return null; }
@@ -76,8 +80,8 @@ export class Fees {
     const ids = due.map((r) => r.id);
     try {
       const ref = ethers.id(ids.join(','));
-      const tx = await this.send({ slot, address: w.address, to: this.contract, valueWei: total.toString(), inputData: IFACE.encodeFunctionData('pay', [ref]) });
-      this.append({ t: 'paid', at: Date.now(), slot, address: w.address, ids, fee: total.toString(), tx });
+      const tx = await this.send({ slot, address: w.address, to: this.payTo(w), valueWei: total.toString(), inputData: IFACE.encodeFunctionData('pay', [ref]) });
+      this.append({ t: 'paid', at: Date.now(), slot, address: w.address, ids, fee: total.toString(), tx, contract: this.payTo(w) });
       this.fails.delete(slot);
       return tx;
     } catch (e) {
@@ -97,7 +101,7 @@ export class Fees {
     const recent = this.rows.filter((r) => r.t === 'due').slice(-limit).reverse()
       .map((r) => ({ at: r.at, id: r.id, slot: r.slot, side: r.side, symbol: r.symbol, base: r.base, fee: feeBnb(BigInt(r.fee)), paid: paidIds.has(r.id) }));
     return {
-      enabled: this.enabled, rate: FEE_RATE, contract: this.contract || null, treasury: FEE_TREASURY, minBnb: feeBnb(FEE_MIN_WEI),
+      enabled: this.enabled, rate: FEE_RATE, contract: this.contract || null, contractV2: this.contractV2 || null, treasury: FEE_TREASURY, minBnb: feeBnb(FEE_MIN_WEI),
       paidBnb: feeBnb(paid.reduce((s, r) => s + BigInt(r.fee), 0n)), owedBnb: feeBnb(owed.reduce((s, r) => s + BigInt(r.fee), 0n)),
       payments: paid.slice(-10).reverse().map((r) => ({ at: r.at, slot: r.slot, fee: feeBnb(BigInt(r.fee)), n: r.ids.length, tx: r.tx })),
       recent,

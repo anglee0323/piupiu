@@ -22,3 +22,16 @@ Verify & Publish → Solidity (Single file)，编译器 `v0.8.24+commit.e11b9ed9
 ### 测试
 
 本地测试链（ganache）上测过：全额转给 treasury、合约余额为 0、`Paid` 事件、0 金额 / 直接转账 / treasury 为 0 都拒绝；`pay` 约 33,000 gas。
+
+
+## PiupiuFeeV2.sol（Agent ID 持有者的手续费收款）
+
+**BSC 主网：`0xC6D56b73ba069CA31f49858F5c91e4d71C0c4645`**（BscScan 已验证）｜部署交易 `0x827991fcfebb7655a742b9a23f7dbc847c5e102a1379c6a714b946a8eee3e529`，区块 134733776
+
+和 V1 一样「收到即全额转给 `treasury`」，多一道链上检查：付款钱包必须持有 Agent ID（`0x60B9262456dE011F7d15a54CdD8c48bAaa8B022F`，`balanceOf > 0`），否则 `pay` 以 `NoAgentId` 回滚。
+`holdsAgentId(address)` 可只读查询。没有 Agent ID 的钱包继续付 V1，行为不变；客户端按钱包身份选合约（`engine/live/fees.js` 的 `payTo()`，身份没查清时走 V1）。
+
+**Owner 权限披露**：无 owner；无增发、无改费率、无暂停、无冻结、无提走用户资产的入口；不接收任何代币授权；不可升级；`treasury` 部署时写死为 `0xAD11aE703dFfDED3ad7caE72871BDCD44EF58CA2`，之后谁都无法修改。部署者对合约没有任何权限。
+
+验证参数：`v0.8.24+commit.e11b9ed9` / Optimization 200 / EVM `paris` / MIT；构造参数 `000000000000000000000000ad11ae703dffded3ad7cae72871bdcd44ef58ca2`。
+部署、验证、退回部署钱包余额都用 `scripts/deploy-fee-v2.mjs`；合约测试见 `contracts/test/PiupiuFeeV2.test.mjs`（ganache，10 项）。

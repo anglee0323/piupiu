@@ -12,7 +12,7 @@ import { review, classifyMintFailure } from './review.js';
 import { readSite, safeUrl } from './research.js';
 import { nftMeta } from './meta.js';
 import { utilities } from './utility.js';
-import { socialInfo, socialEnabled, xSearchUrl } from './social.js';
+import { socialInfo, socialEnabled, xSearchUrl, SOCIAL_RETIRED } from './social.js';
 import { EP } from '../endpoints.js';
 
 /** 链上记录：NFT → OKX 合集页（按合约地址直接打开）+ BscScan 代币页；代币 → DexScreener + BscScan */
@@ -152,7 +152,7 @@ export async function analyze(address, ctx) {
   const xHandles = allLinks.map((u) => /https:\/\/(?:x|twitter)\.com\/([A-Za-z0-9_]{2,15})(?:[/?]|$)/.exec(u)?.[1]).filter((h) => h && !/^(search|intent|home|share|i)$/i.test(h));
   const projName = meta?.name || src.name || (profile.name ? String(profile.name) : null);
   const names = [projName, profile.name ? String(profile.name) : null, profile.symbol ? String(profile.symbol) : null].filter(Boolean);
-  let social = same ? prev?.social || null : null;
+  let social = same && !SOCIAL_RETIRED ? prev?.social || null : null;   // 停用后不沿用以前查到的结果
   // 旧版本（v<4，相关性规则太松）或超过 30 分钟：重新查。只有「这次请求失败」才保留上次同版本的结果，
   // 查询成功但 0 条就是 0 条（以前 0 条时会一直沿用旧版本找到的无关推文）
   if (social && social.v !== 4) social = null;

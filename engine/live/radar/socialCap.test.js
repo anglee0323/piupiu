@@ -6,7 +6,7 @@ let calls = 0;
 globalThis.fetch = async () => { calls++; return { ok: true, json: async () => ({ tweets: [] }) }; };
 const { socialInfo, setSocialDailyCap, socialStats } = await import('./social.js');
 
-test('达到每日上限后不再发请求', async () => {
+test('达到每日上限后不再发请求', { skip: '该功能已停用（SOCIAL_RETIRED）' }, async () => {
   setSocialDailyCap(20);
   const addr = (i) => '0x' + String(i).padStart(40, '0');
   for (let i = 1; i <= 12; i++) await socialInfo(addr(i), ['Some Project Name'], { force: true });   // 每个项目 2 次请求（地址 + 名字）
@@ -17,4 +17,13 @@ test('达到每日上限后不再发请求', async () => {
   assert.match(String(r.error), /已达上限/);
   const st = socialStats();
   assert.equal(st.max, 20); assert.equal(st.capped, true);
+});
+
+test('已停用：不发任何请求，也不沿用旧结果', async () => {
+  const { SOCIAL_RETIRED, socialEnabled } = await import('./social.js');
+  assert.equal(SOCIAL_RETIRED, true);
+  assert.equal(socialEnabled(), false);
+  const before = calls;
+  assert.equal(await socialInfo('0x' + '1'.repeat(40), ['Some Project Name'], { force: true }), null);
+  assert.equal(calls, before);
 });

@@ -93,7 +93,7 @@ baw --version
 | `OPENCHAIN_API` / `FOURBYTE_API` | 雷达：合约函数名 | 函数签名库 |
 | `SOURCIFY_API` | 雷达：已验证的合约源码 | Sourcify API v2 |
 | `TRANSLATE_API` | 雷达：合约说明翻译成中文 | 翻译接口 |
-| `X_SEARCH_API` + `CRAWLERHUB_API_KEY` | 雷达：X 上的讨论、官方账号识别 | 兼容 twitterapi.io 的搜索接口；按次消耗你自己的额度 |
+| `X_SEARCH_API` + `CRAWLERHUB_API_KEY` | 雷达：X 上的讨论、官方账号识别（**已停用**：`SOCIAL_RETIRED`，填了也不发请求） | 兼容 twitterapi.io 的搜索接口；按次消耗你自己的额度 |
 | `FXTWITTER_API` | 单条推文预览 | FxTwitter 兼容接口 |
 
 各接口的服务条款与限流由提供方决定，请自行确认并遵守。

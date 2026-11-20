@@ -95,3 +95,17 @@ test('LiveTrader.chargeFee：买入用下单前扣出的数，卖出按换回的
   assert.equal(f.summary().owedBnb, 0.0035);
   for (const t of f.timers.values()) clearTimeout(t);
 });
+
+test('V2 路由：持有 Agent ID 的钱包付到 V2；没领 / 还没查清的付到 V1；没配 V2 全部 V1', async () => {
+  const V2 = '0x' + '56'.repeat(20);
+  const pay = async (o, agentId) => {
+    const { f, sent, file } = mk({ wallet: () => ({ address: A, bnb: 1, agentId }), ...o });
+    due(f, 'o1', 0.1); await f.pay(1);
+    return { to: sent[0]?.to, paid: JSON.parse(readFileSync(file, 'utf8').trim().split('\n').pop()) };
+  };
+  const a = await pay({ contractV2: V2 }, 'bob.ai');
+  assert.equal(a.to, V2); assert.equal(a.paid.contract, V2, '账本记下实际付到哪个合约');
+  assert.equal((await pay({ contractV2: V2 }, null)).to, C, '没有 Agent ID → 仍走 V1，行为不变');
+  assert.equal((await pay({ contractV2: V2 }, undefined)).to, C, '还没查清 → 走 V1，不赌');
+  assert.equal((await pay({ contractV2: '' }, 'bob.ai')).to, C, '没配 V2 → 全部 V1');
+});

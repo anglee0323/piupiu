@@ -1,0 +1,42 @@
+// PiupiuFeeV2 合约测试（本地 ganache，把 mock 的 Agent ID 放到真实 Agent ID 地址上）。依赖不进 package.json，临时装：
+//   mkdir /tmp/feev2-test && cd /tmp/feev2-test && npm i ganache@7 solc@0.8.24 ethers@6 && cp <本文件> . && node PiupiuFeeV2.test.mjs   （路径按需改），跑完删掉 /tmp/feev2-test
+import ganache from 'ganache';
+import solc from 'solc';
+import { ethers } from 'ethers';
+import { readFileSync } from 'node:fs';
+const AID = '0x60B9262456dE011F7d15a54CdD8c48bAaa8B022F';
+const comp = (name, src, pick) => { const o = JSON.parse(solc.compile(JSON.stringify({ language:'Solidity', sources:{[name]:{content:src}}, settings:{optimizer:{enabled:true,runs:200},evmVersion:'paris',outputSelection:{'*':{'*':['abi','evm.bytecode.object','evm.deployedBytecode.object']}}}}))); const e=(o.errors||[]).filter(x=>x.severity==='error'); if(e.length) throw new Error(e[0].formattedMessage); return o.contracts[name][pick]; };
+const fee = comp('F.sol', readFileSync(process.env.FEE_V2_SOL || new URL('../PiupiuFeeV2.sol', import.meta.url),'utf8'), 'PiupiuFeeV2');
+const mock = comp('M.sol', `pragma solidity 0.8.24; contract M { mapping(address=>uint) public balanceOf; function set(address a,uint n) external { balanceOf[a]=n; } }`, 'M');
+const srv = ganache.server({ logging:{quiet:true}, chain:{chainId:56}, wallet:{totalAccounts:5, defaultBalance:100} });
+await srv.listen(8561);
+const p = new ethers.JsonRpcProvider('http://127.0.0.1:8561', 56, {staticNetwork:true});
+const [holder, other, treasury, deployer] = await Promise.all([0,1,2,3].map(i=>p.getSigner(i)));
+// 把 mock 的运行时字节码放到真实 Agent ID 地址上，再写入持有记录
+await p.send('evm_setAccountCode', [AID, '0x'+mock.evm.deployedBytecode.object]);
+const aid = new ethers.Contract(AID, mock.abi, deployer);
+await (await aid.set(await holder.getAddress(), 1)).wait();
+const F = await new ethers.ContractFactory(fee.abi, '0x'+fee.evm.bytecode.object, deployer).deploy(await treasury.getAddress());
+await F.waitForDeployment();
+let pass=0, fail=0; const ok=(n,c)=>{ c?pass++:fail++; console.log((c?'✓ ':'✗ ')+n); };
+const ref = ethers.id('order-1');
+const revData = async (from, to, data, value='0x0') => { try { await p.send('eth_call',[{from,to,data,value},'latest']); return 'no revert'; } catch(e){ return JSON.stringify(e).toLowerCase(); } };
+const bal = async (a) => BigInt(await p.send('eth_getBalance',[a,'latest']));
+const tb0 = await bal(await treasury.getAddress());
+const rc = await (await F.connect(holder).pay(ref, { value: ethers.parseEther('0.01') })).wait();
+ok('持有者付款成功', rc.status===1);
+ok('treasury 收到全额', (await bal(await treasury.getAddress())) - tb0 === ethers.parseEther('0.01'));
+ok('合约余额为 0', (await bal(await F.getAddress())) === 0n);
+const ev = rc.logs.map(l=>{try{return F.interface.parseLog(l)}catch{return null}}).find(Boolean);
+ok('Paid 事件内容正确', ev?.args[0]===await holder.getAddress() && ev?.args[1]===ethers.parseEther('0.01') && ev?.args[2]===ref);
+let r = await revData(await other.getAddress(), await F.getAddress(), F.interface.encodeFunctionData('pay',[ref]), '0x1');
+ok('没有 Agent ID 的钱包被拒（NoAgentId）', String(r).includes(F.interface.getError('NoAgentId').selector.slice(2)));
+r = await revData(await holder.getAddress(), await F.getAddress(), F.interface.encodeFunctionData('pay',[ref]), '0x0');
+ok('金额为 0 被拒（ZeroAmount）', String(r).includes(F.interface.getError('ZeroAmount').selector.slice(2)));
+r = await revData(await holder.getAddress(), await F.getAddress(), '0x', '0x1');
+ok('直接转账被拒（UsePay）', String(r).includes(F.interface.getError('UsePay').selector.slice(2)));
+ok('holdsAgentId 读取正确', (await F.holdsAgentId(await holder.getAddress())) && !(await F.holdsAgentId(await other.getAddress())));
+ok('treasury 与构造参数一致', (await F.treasury())===await treasury.getAddress());
+ok('无 owner 选择器', !fee.evm.deployedBytecode.object.includes('8da5cb5b'));
+console.log(`\n${pass} 通过 / ${fail} 失败; 字节码 ${fee.evm.bytecode.object.length/2} bytes`);
+await srv.close(); process.exit(fail?1:0);

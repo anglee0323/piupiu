@@ -98,7 +98,7 @@ export class LiveTrader extends EventEmitter {
         if (this.slotLock.get(slot)?.v === 'LOCKED') return true;
         return !!w && [...this.inflight, ...this.tokenQ.keys()].some((k) => String(k).startsWith(`${w.id}|`));
       },
-      wallet: (slot) => { const w = this.wallets.find((x) => x.slot === slot); return w ? { address: w.address, bnb: w.bnb } : null; },
+      wallet: (slot) => { const w = this.wallets.find((x) => x.slot === slot); return w ? { address: w.address, bnb: w.bnb, agentId: this.slotAuth.get(slot)?.agentId || null } : null; },
       log: (m) => console.log(`[手续费] ${m}`),
     });
     this.preapproving = new Set();
