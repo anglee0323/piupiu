@@ -831,7 +831,10 @@ app.get('/api/automation', (req, res) => {
   } catch (e) { return res.status(500).json({ error: e.message }); }
   res.json({ items });
 });
-(await import('./engine/routes/radar.js')).radarRoutes(app, { getRadar: () => radar, LIVE });   // 雷达 / NFT 接口在 engine/routes/radar.js（路由顺序见该文件）
+(await import('./engine/routes/radar.js')).radarRoutes(app, { getRadar: () => radar, LIVE });
+// Piupiu Pass：Agent ID 持有者可选领取的不可转让通行证（不影响任何现有功能）
+const piupiuPass = LIVE ? new (await import('./engine/live/pass.js')).Pass({ trader, provider: market.provider, txProvider: market.tradeProvider, log: (m) => console.log(m) }) : null;
+(await import('./engine/routes/pass.js')).passRoutes(app, { getPass: () => piupiuPass, LIVE });   // 雷达 / NFT 接口在 engine/routes/radar.js（路由顺序见该文件）
 
 process.on('unhandledRejection', (e) => console.error('unhandledRejection:', e?.stack || e));
 process.on('uncaughtException', (e) => console.error('uncaughtException:', e?.stack || e));

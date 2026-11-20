@@ -8,23 +8,27 @@
 |---|---|
 | 项目名称 | Piupiu（不含 Binance / 币安 / BNB 字样） |
 | 官网 | 填 Piupiu 官方下载页 / GitHub 仓库地址（提交前确认） |
-| 参赛合约 | `0xC6D56b73ba069CA31f49858F5c91e4d71C0c4645`（PiupiuFeeV2，BSC，BscScan 已验证） |
+| 参赛合约 | 主：`0x7Ff80cDcf465c19deCe061a509c8B5444Ddf9B77`（PiupiuPass，BSC，BscScan 已验证）<br>另：`0xC6D56b73ba069CA31f49858F5c91e4d71C0c4645`（PiupiuFeeV2，手续费合约，BscScan 已验证）。表单能否填多个地址，提交前向主办方确认 |
 | 源码 | `contracts/PiupiuFeeV2.sol`，MIT，`v0.8.24+commit.e11b9ed9` / Optimization 200 / EVM `paris` |
 
 ## Agent ID 使用说明（可直接粘贴）
 
 Piupiu 是面向 Agentic Wallet 的本地桌面交易终端。用户用自己的 Agentic Wallet（name.ai）登录官方 `baw` CLI，在本机完成狙击、跟单、条件单、雷达铸造等操作；所有涉及资产的操作都在用户的钱包里签名，Piupiu 不托管资产、不保存登录会话替用户下单。
 
-Agent ID 在两处进入核心流程：
+Agent ID 在三处进入产品：
 
 1. **身份**：登录后界面显示钱包的 Agent ID 名称；雷达会识别「仅限 .ai 钱包」的项目并判断用户能否参与。
 2. **支付准入**：成交后的交易手续费（0.5%）通过 PiupiuFeeV2 支付。合约在链上检查付款钱包 `balanceOf(Agent ID) > 0`，没有 Agent ID 的钱包无法使用该合约。手续费金额在界面中可见，付款前预检，需要在币安 App 确认时不会静默发出。
+
+3. **通行证（Piupiu Pass）**：持有 Agent ID 的钱包可在底栏领取一枚免费、不可转让的链上通行证（`PiupiuPass.claim()`，链上校验 `balanceOf(Agent ID) > 0`，一个地址一枚）。它是可选徽章，不附带收益，也不影响任何功能；领取先预检、再由用户确认，从不自动领取。用户也可以不装 Piupiu，让自己的 AI Agent 按 `docs/PIUPIU-PASS-SKILL.md` 领取。
 
 未领取 Agent ID 的钱包仍使用原 V1 合约（`0x208ceCa4E6Dde0D7deE16707a6209257d54B2615`），行为不变。
 
 ## Owner 权限披露
 
-无 owner；无增发、无改费率、无暂停、无冻结、无提走用户资产的入口；不接收代币授权；不可升级；`treasury` 部署时写死为 `0xAD11aE703dFfDED3ad7caE72871BDCD44EF58CA2`，无法修改。部署者对合约没有任何权限。
+PiupiuPass：无 owner；无增发（只有持有者本人能为自己领取）；无升级、无暂停、无改规则；不收款、不接收任何授权；不可转让。部署者对合约没有任何权限。
+
+PiupiuFeeV2：无 owner；无增发、无改费率、无暂停、无冻结、无提走用户资产的入口；不接收代币授权；不可升级；`treasury` 部署时写死为 `0xAD11aE703dFfDED3ad7caE72871BDCD44EF58CA2`，无法修改。部署者对合约没有任何权限。
 
 ## 红线自查
 

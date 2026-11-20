@@ -11,6 +11,7 @@ import { SOCIAL } from '../../../shared/links.js'
 import { BRAND } from '../brand'
 import { AutomationChip } from './AutomationChip'
 import { RiskNote } from './RiskNote'
+import { PiupiuPass } from './PiupiuPass'
 import { UpdateChip } from './UpdateChip'
 import { useT } from '../lib/i18n'
 
@@ -54,6 +55,7 @@ export function BottomBar() {
       </span>
       {/* 真实下单时不显示模式（这里以后放常用链接）；模拟盘 / 演示模式仍然提示：这时下单不会真成交 */}
       {!(mode === 'live' && isReal()) && <span className='h-6 px-2 ml-1 flex items-center rounded-xs text-warn'>{mode !== 'live' ? t('mode.sim') : t('mode.demo')}</span>}
+      <PiupiuPass />
       <RiskNote />
       <SocialLinks />
       <span className="text-t4 ml-2">{BRAND.name}</span>

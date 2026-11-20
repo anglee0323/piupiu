@@ -1,0 +1,47 @@
+// PiupiuPass 合约测试（本地 ganache，把 mock 的 Agent ID 放到真实 Agent ID 地址上）。依赖不进 package.json，临时装：
+//   mkdir /tmp/pass-test && cd /tmp/pass-test && npm i ganache@7 solc@0.8.24 ethers@6 && PASS_SOL=<仓库>/contracts/PiupiuPass.sol node <本文件>，跑完删掉 /tmp/pass-test
+import ganache from 'ganache';
+import solc from 'solc';
+import { ethers } from 'ethers';
+import { readFileSync } from 'node:fs';
+const AID = '0x60B9262456dE011F7d15a54CdD8c48bAaa8B022F';
+const comp = (name, src, pick) => { const o = JSON.parse(solc.compile(JSON.stringify({ language:'Solidity', sources:{[name]:{content:src}}, settings:{optimizer:{enabled:true,runs:200},evmVersion:'paris',outputSelection:{'*':{'*':['abi','evm.bytecode.object','evm.deployedBytecode.object']}}}}))); const e=(o.errors||[]).filter(x=>x.severity==='error'); if(e.length) throw new Error(e[0].formattedMessage); return o.contracts[name][pick]; };
+const pass = comp('P.sol', readFileSync(process.env.PASS_SOL,'utf8'), 'PiupiuPass');
+const mock = comp('M.sol', `pragma solidity 0.8.24; contract M { mapping(address=>uint) public balanceOf; function set(address a,uint n) external { balanceOf[a]=n; } }`, 'M');
+const srv = ganache.server({ logging:{quiet:true}, chain:{chainId:56}, wallet:{totalAccounts:6, defaultBalance:100} });
+await srv.listen(8571);
+const p = new ethers.JsonRpcProvider('http://127.0.0.1:8571', 56, {staticNetwork:true});
+const [h1,h2,nobody,deployer] = await Promise.all([0,1,2,3].map(i=>p.getSigner(i)));
+const A = async s => await s.getAddress();
+await p.send('evm_setAccountCode', [AID, '0x'+mock.evm.deployedBytecode.object]);
+const aid = new ethers.Contract(AID, mock.abi, deployer);
+await (await aid.set(await A(h1),1)).wait(); await (await aid.set(await A(h2),1)).wait();
+const P = await new ethers.ContractFactory(pass.abi, '0x'+pass.evm.bytecode.object, deployer).deploy(); await P.waitForDeployment();
+let pc=0, fc=0; const ok=(n,c)=>{ c?pc++:fc++; console.log((c?'✓ ':'✗ ')+n); };
+const rev = async (from, data, value='0x0') => { try { await p.send('eth_call',[{from,to:await P.getAddress(),data,value},'latest']); return 'no revert'; } catch(e){ return JSON.stringify(e).toLowerCase(); } };
+const sel = n => P.interface.getError(n).selector.slice(2);
+const rc = await (await P.connect(h1).claim()).wait();
+ok('持有者领取成功', rc.status===1);
+ok('编号从 1 开始、totalSupply=1', (await P.passOf(await A(h1)))===1n && (await P.totalSupply())===1n);
+ok('ownerOf / balanceOf 正确', (await P.ownerOf(1))===await A(h1) && (await P.balanceOf(await A(h1)))===1n && (await P.balanceOf(await A(nobody)))===0n);
+const evs = rc.logs.map(l=>{try{return P.interface.parseLog(l)}catch{return null}}).filter(Boolean).map(e=>e.name);
+ok('事件 Transfer / Locked / Claimed', ['Transfer','Locked','Claimed'].every(x=>evs.includes(x)));
+ok('第二个持有者编号为 2', (await (await P.connect(h2).claim()).wait()).status===1 && (await P.passOf(await A(h2)))===2n);
+ok('没有 Agent ID 被拒（NoAgentId）', (await rev(await A(nobody), P.interface.encodeFunctionData('claim'))).includes(sel('NoAgentId')));
+ok('重复领取被拒（AlreadyClaimed）', (await rev(await A(h1), P.interface.encodeFunctionData('claim'))).includes(sel('AlreadyClaimed')));
+for (const [n,args] of [['transferFrom',[await A(h1),await A(h2),1]],['approve',[await A(h2),1]],['setApprovalForAll',[await A(h2),true]],['safeTransferFrom(address,address,uint256)',[await A(h1),await A(h2),1]],['safeTransferFrom(address,address,uint256,bytes)',[await A(h1),await A(h2),1,'0x']]])
+  ok(`${n.split('(')[0]} 一律拒绝（Soulbound）`, (await rev(await A(h1), P.interface.encodeFunctionData(n,args))).includes(sel('Soulbound')));
+ok('不存在的编号被拒', (await rev(await A(h1), P.interface.encodeFunctionData('ownerOf',[99]))).includes(sel('NonexistentToken')));
+ok('直接转 BNB 被拒', (await rev(await A(h1), '0x', '0x1')) !== 'no revert');
+ok('带 value 调 claim 被拒（非 payable）', (await rev(await A(nobody), P.interface.encodeFunctionData('claim'), '0x1')) !== 'no revert');
+ok('locked=true；supportsInterface 721/5192', (await P.locked(1)) && (await P.supportsInterface('0x80ac58cd')) && (await P.supportsInterface('0xb45a3c0e')) && (await P.supportsInterface('0x5b5e139f')) && !(await P.supportsInterface('0xffffffff')));
+const uri = await P.tokenURI(2);
+ok('tokenURI 是 data:application/json;base64', uri.startsWith('data:application/json;base64,'));
+const meta = JSON.parse(Buffer.from(uri.split(',')[1],'base64').toString());
+const svg = Buffer.from(meta.image.split(',')[1],'base64').toString();
+ok('元数据可解析，名称 Piupiu Pass #2', meta.name==='Piupiu Pass #2' && meta.image.startsWith('data:image/svg+xml;base64,'));
+ok('SVG 合法且含编号 #2', svg.startsWith('<svg') && svg.endsWith('</svg>') && svg.includes('>#2<'));
+ok('无 owner / 升级 / 提款选择器', !pass.evm.deployedBytecode.object.includes('8da5cb5b') && !pass.evm.deployedBytecode.object.includes('3659cfe6'));
+ok('holdsAgentId 正确', (await P.holdsAgentId(await A(h1))) && !(await P.holdsAgentId(await A(nobody))));
+console.log(`\n${pc} 通过 / ${fc} 失败；运行时字节码 ${pass.evm.deployedBytecode.object.length/2} bytes；claim gas ${rc.gasUsed}`);
+await srv.close(); process.exit(fc?1:0);

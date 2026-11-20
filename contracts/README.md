@@ -35,3 +35,17 @@ Verify & Publish → Solidity (Single file)，编译器 `v0.8.24+commit.e11b9ed9
 
 验证参数：`v0.8.24+commit.e11b9ed9` / Optimization 200 / EVM `paris` / MIT；构造参数 `000000000000000000000000ad11ae703dffded3ad7cae72871bdcd44ef58ca2`。
 部署、验证、退回部署钱包余额都用 `scripts/deploy-fee-v2.mjs`；合约测试见 `contracts/test/PiupiuFeeV2.test.mjs`（ganache，10 项）。
+
+
+## PiupiuPass.sol（Agent ID 持有者的免费通行证）
+
+**BSC 主网：`0x7Ff80cDcf465c19deCe061a509c8B5444Ddf9B77`**（BscScan 已验证）｜部署交易 `0x907dd74869f92a6346127a2e6b4cad026ea2598c70b959489569b16853e2aece`，区块 134746280
+
+一枚不可转让的 ERC-721 通行证（同时实现 ERC-5192 锁定）：钱包持有 Agent ID（`0x60B9262456dE011F7d15a54CdD8c48bAaa8B022F`，`balanceOf > 0`）才能调用 `claim()`，一个地址一枚，领取免费、只付网络费。
+没有 Agent ID 以 `NoAgentId` 回滚，重复领取以 `AlreadyClaimed` 回滚。所有 `transferFrom` / `safeTransferFrom` / `approve` / `setApprovalForAll` 一律以 `Soulbound` 回滚。
+图片（SVG）和元数据（`tokenURI`）由合约在链上生成，不依赖外部存储。它只是一枚徽章，不附带任何收益或其他权益；Piupiu 的任何功能都不依赖它。
+
+**Owner 权限披露**：无 owner；无增发（只有持有者本人能为自己领取）；无升级、无暂停、无改规则、无提走资产的入口；不收款（没有 payable 函数，也不接收 BNB）；不接收任何代币授权。部署者对合约没有任何权限。
+
+验证参数：`v0.8.24+commit.e11b9ed9` / Optimization 200 / EVM `paris` / MIT；无构造参数。
+部署、验证、退回部署钱包余额都用 `scripts/deploy-pass.mjs`；合约测试见 `contracts/test/PiupiuPass.test.mjs`（ganache，21 项）。让 AI Agent 领取的说明见 `docs/PIUPIU-PASS-SKILL.md`。
